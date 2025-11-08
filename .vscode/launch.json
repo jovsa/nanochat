@@ -5,30 +5,6 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Python: Debug scripts.base_eval",
-            "type": "debugpy",
-            "request": "launch",
-            "module": "scripts.base_eval",
-            "console": "integratedTerminal",
-            "python": "${workspaceFolder}/.venv/bin/python",
-            "cwd": "${workspaceFolder}",
-            "args": [
-                "--max-per-task",
-                "5"
-            ],
-            "justMyCode": true
-        },
-        {
-            "name": "Python: Debug scripts.base_eval (no args)",
-            "type": "debugpy",
-            "request": "launch",
-            "module": "scripts.base_eval",
-            "console": "integratedTerminal",
-            "python": "${workspaceFolder}/.venv/bin/python",
-            "cwd": "${workspaceFolder}",
-            "justMyCode": true
-        },
-        {
             "name": "TorchRun: Debug scripts.base_eval (Multi-GPU)",
             "type": "debugpy",
             "request": "launch",
@@ -38,13 +14,14 @@
             "cwd": "${workspaceFolder}",
             "args": [
                 "--standalone",
-                "--nproc_per_node",
-                "2",
+                "--nproc_per_node=2",
                 "-m",
-                "scripts.base_eval",
+                "${relativeFileDirname}.${fileBasenameNoExtension}",
                 "--",
-                "--max-per-task",
-                "20"
+                "--depth=10",
+                "--device_batch_size=8",
+                "--num_iterations=10",
+                "--run=${env:WANDB_RUN}"
             ],
             "justMyCode": true
         },
