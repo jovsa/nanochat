@@ -18,10 +18,11 @@
                 "-m",
                 "${relativeFileDirname}.${fileBasenameNoExtension}",
                 "--",
-                "--depth=10",
-                "--device_batch_size=8",
-                "--num_iterations=10",
-                "--run=${env:WANDB_RUN}"
+                "--depth=4", "--max_seq_len=512", "--device_batch_size=2", "--eval_tokens=512", "--core_metric_every=-1", "--total_batch_size=2048", "--num_iterations=20", "--run=${env:WANDB_RUN}",
+                // "--depth=10",
+                // "--device_batch_size=8",
+                // "--num_iterations=10",
+                // "--run=${env:WANDB_RUN}"
             ],
             "justMyCode": true
         },

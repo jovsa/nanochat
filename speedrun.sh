@@ -89,6 +89,11 @@ NPROC_PER_NODE=2
 
 # pretrain the d20 model
 torchrun --standalone --nproc_per_node=$NPROC_PER_NODE -m scripts.base_train -- --depth=10 --device_batch_size=8 --num_iterations=10 --run=$WANDB_RUN
+# torchrun --standalone --nproc_per_node=$NPROC_PER_NODE -m scripts.base_train -- --depth=4 --max_seq_len=512 --device_batch_size=1 --eval_tokens=512 --core_metric_every=-1 --total_batch_size=512 --num_iterations=20 --run=$WANDB_RUN
+
+# version 2
+# torchrun --standalone --nproc_per_node=2 -m scripts.base_train -- --depth=4 --max_seq_len=512 --device_batch_size=2 --eval_tokens=512 --core_metric_every=-1 --total_batch_size=2048 --num_iterations=20 --run=$WANDB_RUN
+
 # evaluate the model on a larger chunk of train/val data and draw some samples
 torchrun --standalone --nproc_per_node=$NPROC_PER_NODE -m scripts.base_loss --device_batch_size=8
 # evaluate the model on CORE tasks
