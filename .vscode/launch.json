@@ -12,6 +12,9 @@
             "console": "integratedTerminal",
             "python": "${workspaceFolder}/.venv/bin/python",
             "cwd": "${workspaceFolder}",
+            "env": {
+                "NCCL_P2P_DISABLE": "1"
+            },
             "args": [
                 "--standalone",
                 "--nproc_per_node=2",
