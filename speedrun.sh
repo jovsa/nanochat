@@ -13,8 +13,11 @@
 # Default intermediate artifacts directory is in ~/.cache/nanochat
 export OMP_NUM_THREADS=1
 export NANOCHAT_BASE_DIR="$HOME/.cache/nanochat"
-mkdir -p $NANOCHAT_BASE_DIR
 
+# Disable P2P communication between GPUs to avoid conflicts for  RTX 4000 Ada GPUs
+export NCCL_P2P_DISABLE=1
+
+mkdir -p $NANOCHAT_BASE_DIR
 # -----------------------------------------------------------------------------
 # Python venv setup with uv
 
