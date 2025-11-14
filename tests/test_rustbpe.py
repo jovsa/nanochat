@@ -83,6 +83,9 @@ class RegexTokenizer:
             vocab[idx] = special.encode("utf-8")
         return vocab
 
+    def get_vocab_size(self):
+        return len(self.vocab)
+
     def train(self, text, vocab_size, verbose=False):
         assert vocab_size >= 256
         num_merges = vocab_size - 256
@@ -162,6 +165,27 @@ class RegexTokenizer:
             chunk_ids = self._encode_chunk(chunk_bytes)
             ids.extend(chunk_ids)
         return ids
+
+    def encode(self, text):
+        return self.encode_ordinary(text)
+
+    def decode(self, ids):
+
+        # given ids (list of integers), return Python string
+        part_bytes = []
+        for idx in ids:
+            if idx in self.vocab:
+                part_bytes.append(self.vocab[idx])
+            elif idx in self.inverse_special_tokens:
+                part_bytes.append(self.inverse_special_tokens[idx].encode("utf-8"))
+            else:
+                raise ValueError(f"invalid token id: {idx}")
+        text_bytes = b"".join(part_bytes)
+        text = text_bytes.decode("utf-8", errors="replace")
+        return text
+
+
+
 
 # -----------------------------------------------------------------------------
 # Faster Python tokenizer, optimized version of the reference tokenizer
@@ -371,6 +395,7 @@ class FastRegexTokenizer:
             chunk_ids = self._encode_chunk(chunk_bytes)
             ids.extend(chunk_ids)
         return ids
+
 
 # -----------------------------------------------------------------------------
 # HuggingFace tokenizer

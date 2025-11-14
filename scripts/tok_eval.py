@@ -2,7 +2,7 @@
 Evaluate compression ratio of the tokenizer.
 """
 
-from nanochat.tokenizer import get_tokenizer, RustBPETokenizer
+from nanochat.tokenizer import get_tokenizer, RustBPETokenizer, get_jovsa_tokenizer
 from nanochat.dataset import parquets_iter_batched
 
 # Random text I got from a random website this morning
@@ -164,12 +164,14 @@ if val_text:
 tokenizer_results = {}
 vocab_sizes = {}
 
-for tokenizer_name in ["gpt2", "gpt4", "ours"]:
+for tokenizer_name in ["gpt2", "gpt4", "ours", "jovsa"]:
 
     if tokenizer_name == "gpt2":
         tokenizer = RustBPETokenizer.from_pretrained("gpt2") # gpt-2 base model tokenizer
     elif tokenizer_name == "gpt4":
         tokenizer = RustBPETokenizer.from_pretrained("cl100k_base") # gpt-4 base model tokenizer
+    elif tokenizer_name == "jovsa":
+        tokenizer = get_jovsa_tokenizer()
     else:
         tokenizer = get_tokenizer()
 
@@ -199,6 +201,7 @@ print(f"\nVocab sizes:")
 print(f"GPT-2: {vocab_sizes['gpt2']}")
 print(f"GPT-4: {vocab_sizes['gpt4']}")
 print(f"Ours: {vocab_sizes['ours']}")
+print(f"jovsa: {vocab_sizes['jovsa']}")
 
 def print_comparison(baseline_name, baseline_results, ours_results, all_text):
     """Print comparison table between baseline tokenizer and ours."""
@@ -241,7 +244,7 @@ def print_comparison(baseline_name, baseline_results, ours_results, all_text):
 # Print comparisons
 print_comparison("GPT-2", tokenizer_results['gpt2'], tokenizer_results['ours'], all_text)
 print_comparison("GPT-4", tokenizer_results['gpt4'], tokenizer_results['ours'], all_text)
-
+print_comparison("jovsa", tokenizer_results['jovsa'], tokenizer_results['ours'], all_text)
 # Log to report
 from nanochat.report import get_report
 lines = []

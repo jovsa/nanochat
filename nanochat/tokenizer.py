@@ -379,6 +379,15 @@ class RustBPETokenizer:
 # -----------------------------------------------------------------------------
 # nanochat-specific convenience functions
 
+def get_jovsa_tokenizer():
+    from nanochat.common import get_base_dir
+    base_dir = get_base_dir()
+    tokenizer_dir = os.path.join(base_dir, "tokenizer")
+    # return HuggingFaceTokenizer.from_directory(tokenizer_dir)
+    from tests.test_rustbpe import RegexTokenizer
+    return RegexTokenizer()
+
+
 def get_tokenizer():
     from nanochat.common import get_base_dir
     base_dir = get_base_dir()
