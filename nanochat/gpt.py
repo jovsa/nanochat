@@ -273,7 +273,7 @@ class GPT(nn.Module):
             # inference mode: compute and return the logits
             logits = self.lm_head(x)
             logits = softcap * torch.tanh(logits / softcap) # logits softcap
-            return logits
+            return logits # (B, T, vocab_size)
 
     @torch.inference_mode()
     def generate(self, tokens, max_tokens, temperature=1.0, top_k=None, seed=42):
