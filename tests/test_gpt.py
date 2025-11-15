@@ -19,9 +19,9 @@ from nanochat.engine import KVCache
 # Alternative Model Import (for comparison tests)
 # ============================================================================
 # To compare with an alternative model implementation, uncomment and modify:
-# from nanochat.gpt import GPT_jovsa  # or wherever your alternative model is
-# ALTERNATIVE_MODEL_CLASS = GPT_jovsa
-ALTERNATIVE_MODEL_CLASS = None  # Set this to your alternative model class
+# ALTERNATIVE_MODEL_CLASS = jgpt
+from nanochat.jgpt import JGPT # or wherever your alternative model is
+ALTERNATIVE_MODEL_CLASS = JGPT # Set this to your alternative model class
 
 
 # ============================================================================
@@ -937,8 +937,286 @@ def test_model_comparison_different_inputs(model, alternative_model, small_confi
             logits_ref = model.forward(idx)
             logits_alt = alternative_model.forward(idx)
 
-        assert torch.allclose(logits_ref, logits_alt, atol=1e-5, rtol=1e-5), \
-            f"Outputs differ for batch_size={batch_size}, seq_len={seq_len}: " \
+        assert torch.allclose(logits_ref, logits_alt, atol=1e-5, rtol=1e-5), (
+            f"Outputs differ for batch_size={batch_size}, seq_len={seq_len}: "
             f"max diff = {torch.abs(logits_ref - logits_alt).max().item():.2e}"
+        )
 
 
+def test_model_comparison_block_components(model, alternative_model, small_config, device):
+    """Compare a single transformer block between reference and alternative model."""
+    if alternative_model is None:
+        pytest.skip("No alternative model provided")
+
+    # Ensure weights are aligned between the two models
+    _copy_model_weights(model, alternative_model)
+
+    model.eval()
+    alternative_model.eval()
+
+    # Basic structural assumptions (same components as reference model)
+    assert hasattr(alternative_model, "transformer")
+    assert hasattr(alternative_model.transformer, "h")
+    assert len(alternative_model.transformer.h) == len(model.transformer.h) == small_config.n_layer
+
+    # Use a small synthetic input
+    batch_size, seq_len = 2, 10
+    x = torch.randn(batch_size, seq_len, small_config.n_embd, device=device)
+
+    # Create synthetic rotary embeddings (same shape for both blocks)
+    head_dim = small_config.n_embd // small_config.n_head
+    cos = torch.randn(1, seq_len, 1, head_dim // 2, dtype=torch.bfloat16, device=device)
+    sin = torch.randn(1, seq_len, 1, head_dim // 2, dtype=torch.bfloat16, device=device)
+    cos_sin = (cos, sin)
+
+    ref_block = model.transformer.h[0]
+    alt_block = alternative_model.transformer.h[0]
+
+    with torch.no_grad():
+        y_ref = ref_block(x, cos_sin, kv_cache=None)
+        y_alt = alt_block(x, cos_sin, kv_cache=None)
+
+    # Check shapes and numerical closeness of block outputs
+    assert y_ref.shape == y_alt.shape == (batch_size, seq_len, small_config.n_embd)
+    assert torch.allclose(y_ref, y_alt, atol=1e-5, rtol=1e-5), (
+        f"Block outputs differ: max diff = {torch.abs(y_ref - y_alt).max().item():.2e}"
+    )
+
+
+def test_model_comparison_causal_self_attention_forward(
+    model, alternative_model, small_config, device
+):
+    """Compare CausalSelfAttention forward between reference and alternative model."""
+    if alternative_model is None:
+        pytest.skip("No alternative model provided")
+
+    _copy_model_weights(model, alternative_model)
+
+    model.eval()
+    alternative_model.eval()
+
+    assert hasattr(model.transformer.h[0], "attn")
+    assert hasattr(alternative_model.transformer.h[0], "attn")
+
+    batch_size, seq_len = 2, 10
+    x = torch.randn(batch_size, seq_len, small_config.n_embd, device=device)
+
+    head_dim = small_config.n_embd // small_config.n_head
+    cos = torch.randn(
+        1,
+        seq_len,
+        1,
+        head_dim // 2,
+        dtype=torch.bfloat16,
+        device=device,
+    )
+    sin = torch.randn(
+        1,
+        seq_len,
+        1,
+        head_dim // 2,
+        dtype=torch.bfloat16,
+        device=device,
+    )
+    cos_sin = (cos, sin)
+
+    ref_attn = model.transformer.h[0].attn
+    alt_attn = alternative_model.transformer.h[0].attn
+
+    with torch.no_grad():
+        y_ref = ref_attn(x, cos_sin, kv_cache=None)
+        y_alt = alt_attn(x, cos_sin, kv_cache=None)
+
+    assert y_ref.shape == y_alt.shape == (batch_size, seq_len, small_config.n_embd)
+    assert torch.allclose(y_ref, y_alt, atol=1e-5, rtol=1e-5), (
+        "CausalSelfAttention outputs differ: max diff = "
+        f"{torch.abs(y_ref - y_alt).max().item():.2e}"
+    )
+
+
+def test_model_comparison_causal_self_attention_with_gqa(
+    alternative_model_class, gqa_config, device
+):
+    """Compare CausalSelfAttention with GQA between reference and alternative model."""
+    if alternative_model_class is None:
+        pytest.skip("No alternative model provided")
+
+    model_gqa = GPT(gqa_config)
+    model_gqa.to(device)
+    model_gqa.init_weights()
+
+    try:
+        alt_model_gqa = alternative_model_class(gqa_config)
+    except Exception as exc:  # pragma: no cover - defensive
+        pytest.skip(f"Could not create alternative GQA model instance: {exc}")
+
+    alt_model_gqa.to(device)
+    if hasattr(alt_model_gqa, "init_weights"):
+        alt_model_gqa.init_weights()
+
+    _copy_model_weights(model_gqa, alt_model_gqa)
+
+    model_gqa.eval()
+    alt_model_gqa.eval()
+
+    assert hasattr(model_gqa.transformer.h[0], "attn")
+    assert hasattr(alt_model_gqa.transformer.h[0], "attn")
+
+    batch_size, seq_len = 2, 10
+    x = torch.randn(batch_size, seq_len, gqa_config.n_embd, device=device)
+
+    head_dim = gqa_config.n_embd // gqa_config.n_head
+    cos = torch.randn(
+        1,
+        seq_len,
+        1,
+        head_dim // 2,
+        dtype=torch.bfloat16,
+        device=device,
+    )
+    sin = torch.randn(
+        1,
+        seq_len,
+        1,
+        head_dim // 2,
+        dtype=torch.bfloat16,
+        device=device,
+    )
+    cos_sin = (cos, sin)
+
+    ref_attn = model_gqa.transformer.h[0].attn
+    alt_attn = alt_model_gqa.transformer.h[0].attn
+
+    with torch.no_grad():
+        y_ref = ref_attn(x, cos_sin, kv_cache=None)
+        y_alt = alt_attn(x, cos_sin, kv_cache=None)
+
+    assert y_ref.shape == y_alt.shape == (batch_size, seq_len, gqa_config.n_embd)
+    assert torch.allclose(y_ref, y_alt, atol=1e-5, rtol=1e-5), (
+        "GQA CausalSelfAttention outputs differ: max diff = "
+        f"{torch.abs(y_ref - y_alt).max().item():.2e}"
+    )
+
+
+def test_model_comparison_mlp_components(model, alternative_model, small_config, device):
+    """Compare MLP component between reference and alternative model."""
+    if alternative_model is None:
+        pytest.skip("No alternative model provided")
+
+    _copy_model_weights(model, alternative_model)
+
+    model.eval()
+    alternative_model.eval()
+
+    assert hasattr(model.transformer.h[0], "mlp")
+    assert hasattr(alternative_model.transformer.h[0], "mlp")
+
+    batch_size, seq_len = 2, 10
+    x = torch.randn(batch_size, seq_len, small_config.n_embd, device=device)
+
+    ref_mlp = model.transformer.h[0].mlp
+    alt_mlp = alternative_model.transformer.h[0].mlp
+
+    with torch.no_grad():
+        y_ref = ref_mlp(x)
+        y_alt = alt_mlp(x)
+
+    assert y_ref.shape == y_alt.shape == (batch_size, seq_len, small_config.n_embd)
+    assert torch.allclose(y_ref, y_alt, atol=1e-5, rtol=1e-5), (
+        "MLP outputs differ: max diff = "
+        f"{torch.abs(y_ref - y_alt).max().item():.2e}"
+    )
+
+
+def test_model_comparison_rotary_and_qk_norm(model, alternative_model, small_config, device):
+    """Compare rotary embeddings and QK norm behavior between models."""
+    if alternative_model is None:
+        pytest.skip("No alternative model provided")
+
+    _copy_model_weights(model, alternative_model)
+
+    model.eval()
+    alternative_model.eval()
+
+    assert hasattr(model.transformer.h[0], "attn")
+    assert hasattr(alternative_model.transformer.h[0], "attn")
+
+    batch_size, seq_len = 2, 10
+    x = torch.randn(batch_size, seq_len, small_config.n_embd, device=device)
+
+    head_dim = small_config.n_embd // small_config.n_head
+    cos = torch.randn(
+        1,
+        seq_len,
+        1,
+        head_dim // 2,
+        dtype=torch.bfloat16,
+        device=device,
+    )
+    sin = torch.randn(
+        1,
+        seq_len,
+        1,
+        head_dim // 2,
+        dtype=torch.bfloat16,
+        device=device,
+    )
+
+    ref_attn = model.transformer.h[0].attn
+    alt_attn = alternative_model.transformer.h[0].attn
+
+    with torch.no_grad():
+        q_ref = ref_attn.c_q(x).view(
+            batch_size,
+            seq_len,
+            small_config.n_head,
+            head_dim,
+        )
+        k_ref = ref_attn.c_k(x).view(
+            batch_size,
+            seq_len,
+            small_config.n_kv_head,
+            head_dim,
+        )
+        q_alt = alt_attn.c_q(x).view(
+            batch_size,
+            seq_len,
+            small_config.n_head,
+            head_dim,
+        )
+        k_alt = alt_attn.c_k(x).view(
+            batch_size,
+            seq_len,
+            small_config.n_kv_head,
+            head_dim,
+        )
+
+        q_ref_rot = apply_rotary_emb(q_ref, cos, sin)
+        k_ref_rot = apply_rotary_emb(k_ref, cos, sin)
+        q_alt_rot = apply_rotary_emb(q_alt, cos, sin)
+        k_alt_rot = apply_rotary_emb(k_alt, cos, sin)
+
+        q_ref_norm = norm(q_ref_rot)
+        k_ref_norm = norm(k_ref_rot)
+        q_alt_norm = norm(q_alt_rot)
+        k_alt_norm = norm(k_alt_rot)
+
+    # Rotary embedding comparison
+    assert torch.allclose(q_ref_rot, q_alt_rot, atol=1e-5, rtol=1e-5), (
+        "Rotary Q projections differ: max diff = "
+        f"{torch.abs(q_ref_rot - q_alt_rot).max().item():.2e}"
+    )
+    assert torch.allclose(k_ref_rot, k_alt_rot, atol=1e-5, rtol=1e-5), (
+        "Rotary K projections differ: max diff = "
+        f"{torch.abs(k_ref_rot - k_alt_rot).max().item():.2e}"
+    )
+
+    # QK norm comparison
+    assert torch.allclose(q_ref_norm, q_alt_norm, atol=1e-5, rtol=1e-5), (
+        "Q normed projections differ: max diff = "
+        f"{torch.abs(q_ref_norm - q_alt_norm).max().item():.2e}"
+    )
+    assert torch.allclose(k_ref_norm, k_alt_norm, atol=1e-5, rtol=1e-5), (
+        "K normed projections differ: max diff = "
+        f"{torch.abs(k_ref_norm - k_alt_norm).max().item():.2e}"
+    )
