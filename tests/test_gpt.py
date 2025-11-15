@@ -593,7 +593,7 @@ def test_cross_entropy_matches_manual_implementation(model, sample_input, sample
 
     # 2) Flatten logits and targets the same way GPT.forward does
     vocab_size = logits.size(-1)
-    logits_flat = logits.float().view(-1, vocab_size)  # (N, C)
+    logits_flat = logits.view(-1, vocab_size)  # (N, C)
     targets_flat = sample_targets.view(-1)             # (N,)
 
     # 3) Apply ignore_index=-1 by masking out those positions
