@@ -578,6 +578,39 @@ def test_qk_norm(small_config, device):
     assert torch.allclose(k_rms, torch.ones_like(k_rms), atol=0.1)
 
 
+# New test: verify cross-entropy loss matches manual computation
+def test_cross_entropy_matches_manual_implementation(model, sample_input, sample_targets):
+    """Test that GPT's cross-entropy loss matches a manual implementation."""
+    model.train()
+
+    # Loss computed inside GPT.forward (uses F.cross_entropy with ignore_index=-1)
+    loss_builtin = model.forward(sample_input, targets=sample_targets, loss_reduction="mean")
+
+    # Manually compute the same loss:
+    # 1) Get logits from the model (these already include the softcap transformation)
+    with torch.no_grad():
+        logits = model.forward(sample_input)  # (B, T, vocab_size)
+
+    # 2) Flatten logits and targets the same way GPT.forward does
+    vocab_size = logits.size(-1)
+    logits_flat = logits.float().view(-1, vocab_size)  # (N, C)
+    targets_flat = sample_targets.view(-1)             # (N,)
+
+    # 3) Apply ignore_index=-1 by masking out those positions
+    valid_mask = targets_flat != -1
+    logits_valid = logits_flat[valid_mask]             # (M, C)
+    targets_valid = targets_flat[valid_mask]           # (M,)
+
+    # 4) Manual cross-entropy: -log softmax at the target class, averaged over valid positions
+    log_probs = torch.log_softmax(logits_valid, dim=-1)  # (M, C)
+    indices = torch.arange(targets_valid.size(0), device=logits_valid.device)
+    nll = -log_probs[indices, targets_valid]             # (M,)
+    loss_manual = nll.mean()
+
+    # 5) Compare manual loss with the model's built-in loss
+    assert torch.allclose(loss_builtin, loss_manual, atol=1e-5, rtol=1e-5)
+
+
 # ============================================================================
 # Optimizer Setup Tests
 # ============================================================================
