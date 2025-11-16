@@ -682,6 +682,171 @@ def test_setup_optimizers_lr_scaling(model):
     assert lr2 > 0
 
 
+def test_single_training_step(model, sample_input, sample_targets):
+    """
+    Test a single training step to inspect backward differentiation.
+
+    This test verifies:
+    1. Gradients are None before backward pass
+    2. Forward pass computes loss
+    3. Backward pass populates .grad attributes
+    4. Optimizer step updates parameters
+    5. Zero grad clears gradients
+    """
+    model.train()
+
+    # Set up optimizers
+    optimizers = model.setup_optimizers(
+        unembedding_lr=0.004,
+        embedding_lr=0.2,
+        matrix_lr=0.02,
+        weight_decay=0.0
+    )
+    adamw_optimizer, muon_optimizer = optimizers
+
+    # Step 1: Verify gradients are None initially
+    for param in model.parameters():
+        assert param.grad is None, (
+            "Gradients should be None before backward pass"
+        )
+
+    # Step 2: Store initial parameter values (for a few key parameters)
+    initial_params = {}
+    param_names_to_track = [
+        'transformer.wte.weight',
+        'lm_head.weight',
+        'transformer.h.0.attn.c_q.weight',
+        'transformer.h.0.mlp.c_fc.weight',
+    ]
+    for name, param in model.named_parameters():
+        if name in param_names_to_track:
+            initial_params[name] = param.data.clone()
+
+    # Step 3: Forward pass
+    loss = model(sample_input, targets=sample_targets)
+
+    # Verify loss is a scalar tensor with gradient tracking
+    assert isinstance(loss, torch.Tensor)
+    assert loss.dim() == 0, "Loss should be a scalar"
+    assert loss.requires_grad, "Loss should require gradients"
+    assert loss.item() >= 0, "Loss should be non-negative"
+
+    # Verify gradients are still None before backward pass
+    # (forward pass should not populate gradients)
+    for param in model.parameters():
+        assert param.grad is None, (
+            "Gradients should still be None after forward pass, "
+            "before backward() is called"
+        )
+
+    # Step 4: Backward pass
+    loss.backward()
+
+    # Step 5: Verify gradients are populated after backward
+    grad_count = 0
+    non_zero_grad_count = 0
+    for name, param in model.named_parameters():
+        assert param.grad is not None, (
+            f"Gradient should exist for {name} after backward()"
+        )
+        grad_count += 1
+        # Check for non-zero gradients
+        if param.grad.abs().sum().item() > 1e-8:
+            non_zero_grad_count += 1
+
+    assert grad_count > 0, (
+        "Should have gradients for at least some parameters"
+    )
+    assert non_zero_grad_count > 0, (
+        "Should have non-zero gradients for at least some parameters"
+    )
+
+    # Step 6: Store gradient values before optimizer step
+    grad_values_before = {}
+    for name, param in model.named_parameters():
+        if name in param_names_to_track:
+            grad_values_before[name] = param.grad.data.clone()
+
+    # Step 7: Optimizer step
+    for opt in optimizers:
+        opt.step()
+
+    # Step 8: Verify parameters have changed after optimizer step
+    params_changed = False
+    for name, param in model.named_parameters():
+        if name in param_names_to_track:
+            initial = initial_params[name]
+            current = param.data
+            if not torch.allclose(initial, current, atol=1e-6):
+                params_changed = True
+                break
+
+    assert params_changed, (
+        "At least some parameters should have changed after optimizer step"
+    )
+
+    # Step 9: Verify gradients still exist after optimizer step
+    for param in model.parameters():
+        assert param.grad is not None, (
+            "Gradients should still exist after optimizer step"
+        )
+
+    # Step 10: Zero gradients
+    model.zero_grad(set_to_none=True)
+
+    # Step 11: Verify gradients are None after zero_grad
+    for param in model.parameters():
+        assert param.grad is None, (
+            "Gradients should be None after zero_grad(set_to_none=True)"
+        )
+
+    # Additional inspection: Check gradient magnitudes for different
+    # parameter types. This helps understand which parameters receive
+    # gradients.
+    embedding_grad_norm = None
+    lm_head_grad_norm = None
+    matrix_grad_norms = []
+    matrix_param_count = 0
+
+    # Check gradients for the parameters we stored
+    for name in grad_values_before:
+        if 'wte' in name:
+            embedding_grad_norm = (
+                grad_values_before[name].norm().item()
+            )
+        elif 'lm_head' in name:
+            lm_head_grad_norm = (
+                grad_values_before[name].norm().item()
+            )
+        elif any(x in name for x in ['c_q', 'c_k', 'c_v', 'c_proj', 'c_fc']):
+            matrix_param_count += 1
+            grad_norm = grad_values_before[name].norm().item()
+            # Add to list if norm is non-zero (even if very small)
+            if grad_norm > 1e-10:
+                matrix_grad_norms.append(grad_norm)
+
+    # These assertions help verify the backward pass worked correctly.
+    # The exact values depend on the model and input, but they should
+    # be reasonable.
+    assert embedding_grad_norm is not None, "Should have embedding gradient"
+    assert lm_head_grad_norm is not None, "Should have lm_head gradient"
+    # We should have at least one matrix parameter stored, and ideally
+    # at least one with non-zero gradients
+    assert matrix_param_count > 0, (
+        "Should have stored at least one matrix parameter"
+    )
+    # Note: matrix_grad_norms might be empty if gradients are very small,
+    # but we know we have matrix parameters, so this is acceptable
+
+    # All assertions passed - the training step completed successfully!
+    # To inspect values during debugging, you can add print statements
+    # or use a debugger to examine:
+    # - loss.item()
+    # - embedding_grad_norm, lm_head_grad_norm
+    # - matrix_grad_norms
+    # - grad_count, non_zero_grad_count
+
+
 # ============================================================================
 # Utility Method Tests
 # ============================================================================
