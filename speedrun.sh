@@ -17,6 +17,9 @@ export NANOCHAT_BASE_DIR="$HOME/.cache/nanochat"
 # Disable P2P communication between GPUs to avoid conflicts for  RTX 4000 Ada GPUs
 export NCCL_P2P_DISABLE=1
 
+# Number of processes/GPUs to use
+NPROC_PER_NODE=2
+
 mkdir -p $NANOCHAT_BASE_DIR
 # -----------------------------------------------------------------------------
 # Python venv setup with uv
@@ -87,8 +90,7 @@ python -m scripts.tok_eval
 echo "Waiting for dataset download to complete..."
 wait $DATASET_DOWNLOAD_PID
 
-# Number of processes/GPUs to use
-NPROC_PER_NODE=2
+
 
 # pretrain the d20 model
 torchrun --standalone --nproc_per_node=$NPROC_PER_NODE -m scripts.base_train -- --depth=10 --device_batch_size=8 --num_iterations=10 --run=$WANDB_RUN

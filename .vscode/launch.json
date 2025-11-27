@@ -4,6 +4,7 @@
     // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
     "version": "0.2.0",
     "configurations": [
+
         {
             "name": "TorchRun: Debug scripts.base_eval (Multi-GPU)",
             "type": "debugpy",
@@ -26,6 +27,27 @@
                 // "--device_batch_size=8",
                 // "--num_iterations=10",
                 // "--run=${env:WANDB_RUN}"
+            ],
+            "justMyCode": true
+        },
+        {
+            "name": "TorchRun: Debug scripts.chat_sft (Multi-GPU)",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "torch.distributed.run",
+            "console": "integratedTerminal",
+            "python": "${workspaceFolder}/.venv/bin/python",
+            "cwd": "${workspaceFolder}",
+            "env": {
+                "NCCL_P2P_DISABLE": "1"
+            },
+            "args": [
+                "--standalone",
+                "--nproc_per_node=2",
+                "-m",
+                "${relativeFileDirname}.${fileBasenameNoExtension}",
+                "--",
+                "--device_batch_size=4", "--num_iterations=10",
             ],
             "justMyCode": true
         },
