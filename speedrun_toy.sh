@@ -141,17 +141,17 @@ print_elapsed "SFT"
 # Reinforcement Learning on GSM8K (GRPO-style)
 
 # run reinforcement learning with reduced parameters
-# torchrun --standalone --nproc_per_node=$NPROC_PER_NODE -m scripts.chat_rl -- \
-#     --device_batch_size=2 \
-#     --examples_per_step=4 \
-#     --num_samples=4 \
-#     --eval_every=10 \
-#     --save_every=20 \
-#     --eval_examples=50 \
-#     --run=$WANDB_RUN
-# # eval the RL model on GSM8K
-# torchrun --standalone --nproc_per_node=$NPROC_PER_NODE -m scripts.chat_eval -- -i rl -a GSM8K
-# print_elapsed "RL"
+torchrun --standalone --nproc_per_node=$NPROC_PER_NODE -m scripts.chat_rl -- \
+    --device_batch_size=2 \
+    --examples_per_step=4 \
+    --num_samples=4 \
+    --eval_every=10 \
+    --save_every=20 \
+    --eval_examples=50 \
+    --run=$WANDB_RUN
+# eval the RL model on GSM8K
+torchrun --standalone --nproc_per_node=$NPROC_PER_NODE -m scripts.chat_eval -- -i rl -a GSM8K
+print_elapsed "RL"
 
 # chat with the model over CLI! Leave out the -p to chat interactively
 # python -m scripts.chat_cli -p "Why is the sky blue?"
