@@ -53,10 +53,10 @@ class ModelSetup:
         self.sequence_len = sequence_len
         self.window_pattern = window_pattern
 
-        # YOUR CODE HERE: Compute the remaining config values
-        self.n_head = 6
-        self.n_kv_head = 6
-        self.n_embd = 768
+        # Derive config from depth (same as nanochat GPTConfig)
+        self.n_head = max(1, depth // 2)
+        self.n_kv_head = self.n_head
+        self.n_embd = self.n_head * 128
         self.vocab_size = 32768
 
 
@@ -75,7 +75,7 @@ class ModelSetup:
         - Final shapes need batch and head dims added: (1, T, 1, head_dim//2)
         """
 
-        base = 1_000
+        base = 10000
         head_dim = self.n_embd // self.n_head
 
         channel_range = torch.arange(0, head_dim, 2, dtype=torch.float32, device=device)
@@ -106,8 +106,21 @@ class ModelSetup:
             - Pattern is tiled across layers
             - Final layer ALWAYS gets full context regardless of pattern
         """
-        # YOUR CODE HERE
-        raise NotImplementedError("Implement window sizes computation")
+        long_window = self.sequence_len
+        short_window = long_window // 2
+        char_to_window = {
+            "L" : (long_window, 0),
+            "S" : (short_window, 0),
+        }
+
+        window_sizes = []
+        for layer_idx in range(self.n_layer):
+            char = self.window_pattern[layer_idx % len(self.window_pattern)]
+            window_sizes.append(char_to_window[char])
+        window_sizes[-1] = (long_window, 0)
+        return window_sizes
+
+
 
 
 # =============================================================================
