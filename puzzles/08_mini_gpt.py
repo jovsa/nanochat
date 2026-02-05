@@ -2,10 +2,10 @@
 Puzzle 8: Mini GPT from Scratch ⭐⭐⭐⭐⭐
 Goal: Build the model itself.
 
-Usage:
-python puzzles/08_mini_gpt.py          # Run the puzzle
-python puzzles/08_mini_gpt.py --verify # Verify your solution
-python puzzles/08_mini_gpt.py --peek   # See reference solution (oracle)
+Usage (from repo root):
+python -m puzzles.08_mini_gpt          # Run the puzzle
+python -m puzzles.08_mini_gpt --verify # Verify your solution
+python -m puzzles.08_mini_gpt --peek   # See reference solution (oracle)
 """
 
 import argparse

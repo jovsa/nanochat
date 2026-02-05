@@ -2,10 +2,10 @@
 Puzzle 5: The RL Loop ⭐⭐⭐⭐⭐
 Goal: Build the complete GRPO training loop.
 
-Usage:
-python puzzles/05_rl_loop.py          # Run the puzzle
-python puzzles/05_rl_loop.py --verify # Verify your solution
-python puzzles/05_rl_loop.py --peek   # See reference solution (oracle)
+Usage (from repo root):
+python -m puzzles.05_rl_loop          # Run the puzzle
+python -m puzzles.05_rl_loop --verify # Verify your solution
+python -m puzzles.05_rl_loop --peek   # See reference solution (oracle)
 """
 
 import argparse

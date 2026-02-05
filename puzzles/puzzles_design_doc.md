@@ -17,10 +17,10 @@
     Puzzle X: [Name]
     Goal: [Short Goal]
 
-    Usage:
-    python puzzles/0X_name.py          # Run the puzzle
-    python puzzles/0X_name.py --verify # Verify your solution
-    python puzzles/0X_name.py --peek   # See reference solution (oracle)
+    Usage (from repo root):
+    python -m puzzles.0X_name          # Run the puzzle
+    python -m puzzles.0X_name --verify # Verify your solution
+    python -m puzzles.0X_name --peek   # See reference solution (oracle)
     """
     ```
 
@@ -155,7 +155,7 @@ For every puzzle:
 1.  **The Oracle**: The test suite imports the actual `nanochat` modules as the ground truth.
 2.  **The Challenge**: You implement a feature (e.g., `ModelSetup`) to match the behavior of the existing codebase.
 3.  **The Solution**: If you are stuck, the `peek()` function will output the **actual source code lines** from the repository that implement the logic.
-    - Example: `python puzzles/01_transformer_blueprint.py --peek` will print lines from `nanochat/gpt.py` and `scripts/base_train.py`.
+    - Example: `python -m puzzles.01_transformer_blueprint --peek` (from repo root) will print lines from `nanochat/gpt.py` and `scripts/base_train.py`.
 
 **Verification**: 
 We use the `nanochat` codebase as the ground truth oracle.

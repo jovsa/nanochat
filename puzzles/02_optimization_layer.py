@@ -2,10 +2,10 @@
 Puzzle 2: The Optimization Layer ⭐⭐⭐⭐⭐
 Goal: Build the training stepper with Muon optimizer and LR schedules.
 
-Usage:
-python puzzles/02_optimization_layer.py          # Run the puzzle
-python puzzles/02_optimization_layer.py --verify # Verify your solution
-python puzzles/02_optimization_layer.py --peek   # See reference solution (oracle)
+Usage (from repo root):
+python -m puzzles.02_optimization_layer          # Run the puzzle
+python -m puzzles.02_optimization_layer --verify # Verify your solution
+python -m puzzles.02_optimization_layer --peek   # See reference solution (oracle)
 """
 
 import sys

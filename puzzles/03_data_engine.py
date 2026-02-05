@@ -2,10 +2,10 @@
 Puzzle 3: The Data Engine ⭐⭐⭐⭐
 Goal: Build a high-performance data pipeline for SFT and Pretraining.
 
-Usage:
-python puzzles/03_data_engine.py          # Run the puzzle
-python puzzles/03_data_engine.py --verify # Verify your solution
-python puzzles/03_data_engine.py --peek   # See reference solution (oracle)
+Usage (from repo root):
+python -m puzzles.03_data_engine          # Run the puzzle
+python -m puzzles.03_data_engine --verify # Verify your solution
+python -m puzzles.03_data_engine --peek   # See reference solution (oracle)
 """
 
 import sys

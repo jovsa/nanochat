@@ -2,10 +2,10 @@
 Puzzle 4: The Inference Engine ⭐⭐⭐⭐⭐
 Goal: Build the streaming generation loop with tool use.
 
-Usage:
-python puzzles/04_inference_engine.py          # Run the puzzle
-python puzzles/04_inference_engine.py --verify # Verify your solution
-python puzzles/04_inference_engine.py --peek   # See reference solution (oracle)
+Usage (from repo root):
+python -m puzzles.04_inference_engine          # Run the puzzle
+python -m puzzles.04_inference_engine --verify # Verify your solution
+python -m puzzles.04_inference_engine --peek   # See reference solution (oracle)
 """
 
 import argparse

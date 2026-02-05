@@ -2,10 +2,10 @@
 Puzzle 7: The Sandbox & Tokenizer ⭐⭐⭐⭐⭐
 Goal: Build the safety and text processing layer.
 
-Usage:
-python puzzles/07_sandbox_tokenizer.py          # Run the puzzle
-python puzzles/07_sandbox_tokenizer.py --verify # Verify your solution
-python puzzles/07_sandbox_tokenizer.py --peek   # See reference solution (oracle)
+Usage (from repo root):
+python -m puzzles.07_sandbox_tokenizer          # Run the puzzle
+python -m puzzles.07_sandbox_tokenizer --verify # Verify your solution
+python -m puzzles.07_sandbox_tokenizer --peek   # See reference solution (oracle)
 """
 
 import argparse

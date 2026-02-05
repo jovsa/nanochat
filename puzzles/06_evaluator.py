@@ -2,10 +2,10 @@
 Puzzle 6: The Evaluator ⭐⭐⭐⭐
 Goal: Build the evaluation system with CORE metric.
 
-Usage:
-python puzzles/06_evaluator.py          # Run the puzzle
-python puzzles/06_evaluator.py --verify # Verify your solution
-python puzzles/06_evaluator.py --peek   # See reference solution (oracle)
+Usage (from repo root):
+python -m puzzles.06_evaluator          # Run the puzzle
+python -m puzzles.06_evaluator --verify # Verify your solution
+python -m puzzles.06_evaluator --peek   # See reference solution (oracle)
 """
 
 import argparse
