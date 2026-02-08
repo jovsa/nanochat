@@ -14,6 +14,10 @@ import torch.nn as nn
 import torch.nn.functional as F
 import inspect
 from dataclasses import dataclass
+import importlib
+
+_transformer_blueprint = importlib.import_module("puzzles.01_transformer_blueprint")
+ModelSetup = _transformer_blueprint.ModelSetup
 
 # =============================================================================
 # YOUR TASK: Implement the MiniGPT model
@@ -63,8 +67,13 @@ def apply_rotary_emb(x: torch.Tensor, cos: torch.Tensor, sin: torch.Tensor) -> t
         y2 = -x1 * sin + x2 * cos
         y = concat(y1, y2)
     """
-    # YOUR CODE HERE
-    raise NotImplementedError("Implement RoPE")
+    assert x.ndim == 4
+    d = x.shape[3]//2
+    x1, x2 = x[..., :d], x[..., d:] # split up last dim into two halves
+    y1 = x1 * cos + x2 * sin # rotate pairs of dims
+    y2 = x1 * (-sin) + x2 * cos
+    return torch.cat([y1, y2], 3)
+
 
 
 class CausalSelfAttention(nn.Module):
@@ -84,12 +93,16 @@ class CausalSelfAttention(nn.Module):
         self.n_kv_head = config.n_kv_head
         self.head_dim = config.n_embd // config.n_head
 
-        # YOUR CODE HERE: Define linear layers
+
         # c_q: n_embd -> n_head * head_dim
+        self.c_q = nn.Linear(config.n_embd, config.n_head * self.head_dim, bias=False)
         # c_k: n_embd -> n_kv_head * head_dim
+        self.c_k = nn.Linear(config.n_embd, config.n_head * self.head_dim, bias=False)
         # c_v: n_embd -> n_kv_head * head_dim
+        self.c_v = nn.Linear(config.n_embd, config.n_head * self.head_dim, bias=False)
+
         # c_proj: n_embd -> n_embd
-        raise NotImplementedError("Implement attention layers")
+        self.c_proj = nn.Linear(config.n_embd, config.n_embd, bias=False)
 
     def forward(self, x: torch.Tensor, cos_sin: tuple,
                 window_size: tuple = (-1, 0)) -> torch.Tensor:
@@ -105,13 +118,42 @@ class CausalSelfAttention(nn.Module):
             Output of shape (B, T, C)
         """
         # YOUR CODE HERE
-        # 1. Project to Q, K, V
-        # 2. Reshape to (B, T, H, D)
-        # 3. Apply RoPE to Q and K
-        # 4. Apply QK normalization
-        # 5. Compute attention (can use F.scaled_dot_product_attention)
-        # 6. Project output
-        raise NotImplementedError("Implement attention forward")
+        B, T, C = x.size()
+
+        # 1. Project to Q, K, V and reshape to (B, T, H, D)
+        q = self.c_q(x).view(B, T, self.n_head, self.head_dim)   # (B, T, H, D)
+        k = self.c_k(x).view(B, T, self.n_head, self.head_dim)   # (B, T, H, D)
+        v = self.c_v(x).view(B, T, self.n_head, self.head_dim)   # (B, T, H, D)
+
+        # 2. Apply RoPE to Q and K; cos/sin (1, T, 1, D/2) broadcast with (B, T, H, D)
+        cos, sin = cos_sin
+        q, k = apply_rotary_emb(q, cos, sin), apply_rotary_emb(k, cos, sin)  # (B, T, H, D)
+
+        # 3. Apply QK normalization
+        q, k = norm(q), norm(k)  # (B, T, H, D)
+
+        # 4. Transpose to (B, H, T, D) for attention matmul
+        q = q.transpose(1, 2)   # (B, H, T, D)
+        k = k.transpose(1, 2)   # (B, H, T, D)
+        v = v.transpose(1, 2)   # (B, H, T, D)
+
+        # 5. Compute attention: (B, H, T, D) @ (B, H, D, T) -> (B, H, T, T)
+        scores = (q @ k.transpose(-2, -1)) / (self.head_dim ** 0.5)  # (B, H, T, T)
+
+        # 5.1 Apply causal mask (1, 1, T, T) broadcasts to (B, H, T, T)
+        causal_mask = torch.tril(torch.ones(T, T, device=scores.device)).view(1, 1, T, T)
+        scores = scores.masked_fill(causal_mask == 0, float('-inf'))  # (B, H, T, T)
+
+        # 5.2 Get attention weights
+        attn_weights = F.softmax(scores, dim=-1)  # (B, H, T, T)
+
+        out = attn_weights @ v  # (B, H, T, T) @ (B, H, T, D) -> (B, H, T, D)
+
+        # 6. Project output: (B, H, T, D) -> (B, T, H, D) -> (B, T, C)
+        out = out.transpose(1, 2).contiguous().view(B, T, C)  # (B, T, C)
+        out = self.c_proj(out)  # (B, T, C)
+        return out
+
 
 
 class MLP(nn.Module):
@@ -124,13 +166,17 @@ class MLP(nn.Module):
 
     def __init__(self, config: MiniGPTConfig):
         super().__init__()
-        # YOUR CODE HERE
-        raise NotImplementedError("Implement MLP layers")
+        self.c_fc = nn.Linear(config.n_embd, 4 * config.n_embd, bias=False)
+        self.c_proj = nn.Linear(4 * config.n_embd, config.n_embd, bias=False)
+
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """Apply MLP with ReLU^2 activation."""
-        # YOUR CODE HERE
-        raise NotImplementedError("Implement MLP forward")
+        x = self.c_fc(x)
+        x = F.relu(x).square()
+        x = self.c_proj(x)
+        return x
+
 
 
 class Block(nn.Module):
@@ -138,16 +184,15 @@ class Block(nn.Module):
 
     def __init__(self, config: MiniGPTConfig, layer_idx: int):
         super().__init__()
-        # YOUR CODE HERE
-        raise NotImplementedError("Implement block")
+        self.attn = CausalSelfAttention(config, layer_idx)
+        self.mlp = MLP(config)
 
     def forward(self, x: torch.Tensor, cos_sin: tuple,
                 window_size: tuple) -> torch.Tensor:
         """Block forward with pre-norm and residuals."""
-        # YOUR CODE HERE
-        # x = x + attn(norm(x))
-        # x = x + mlp(norm(x))
-        raise NotImplementedError("Implement block forward")
+        x = x + self.attn(norm(x), cos_sin)
+        x = x + self.mlp(norm(x))
+        return x
 
 
 class MiniGPT(nn.Module):
@@ -165,11 +210,33 @@ class MiniGPT(nn.Module):
         super().__init__()
         self.config = config
         # YOUR CODE HERE: Build the model
-        # - wte: Embedding
-        # - blocks: ModuleList of Block
-        # - lm_head: Linear
-        # - Register cos/sin buffers for RoPE
-        raise NotImplementedError("Implement model init")
+        # Token embedding
+        self.transformer = nn.ModuleDict({
+            "wte": nn.Embedding(config.vocab_size, config.n_embd),
+            "h": nn.ModuleList([Block(config, i) for i in range(config.n_layer)])
+        })
+
+        # Language model head (untied from embedding)
+        self.lm_head = nn.Linear(config.n_embd, config.vocab_size, bias=False)
+
+        # Precompute RoPE embeddings
+        head_dim = config.n_embd // config.n_head
+
+        setup = ModelSetup(
+            depth=config.n_layer,
+            sequence_len=config.sequence_len,
+            window_pattern=config.window_pattern)
+        # Puzzle 1 derives n_embd/n_head from depth; we need to match our config
+        setup.n_embd = config.n_embd
+        setup.n_head = config.n_head
+
+        cos, sin = setup.compute_rotary_embeddings()
+        self.register_buffer("cos", cos, persistent=False)
+        self.register_buffer("sin", sin, persistent=False)
+
+        # Compute window sizes for each layer based on pattern
+        self.window_sizes = setup.compute_window_sizes()
+
 
     def forward(self, idx: torch.Tensor,
                 targets: torch.Tensor = None) -> torch.Tensor:
@@ -185,7 +252,38 @@ class MiniGPT(nn.Module):
             Else: logits of shape (B, T, vocab_size)
         """
         # YOUR CODE HERE
-        raise NotImplementedError("Implement forward pass")
+        B, T = idx.size()
+
+        # Get rotary embeddings for current sequence length
+        cos_sin = (self.cos[:, :T], self.sin[:, :T])
+
+        # 1. Embed tokens
+        x = self.transformer.wte(idx)  # (B, T, n_embd)
+
+        # 2. Pass through transformer blocks
+        for i, block in enumerate(self.transformer.h):
+            x = block(x, cos_sin, self.window_sizes[i])
+
+        # 3. Final normalization
+        x = norm(x)
+
+        # 4. Project to vocab (lm_head)
+        logits = self.lm_head(x)  # (B, T, vocab_size)
+
+        # 5. Apply softcapping at 15
+        softcap = 15.0
+        logits = softcap * torch.tanh(logits / softcap)
+
+        # 6. Compute loss if targets provided
+        if targets is not None:
+            loss = F.cross_entropy(
+                logits.view(-1, logits.size(-1)),  # (B*T, vocab_size)
+                targets.view(-1),                   # (B*T,)
+                reduction='mean'
+            )
+            return loss
+        else:
+            return logits
 
 
 # =============================================================================
