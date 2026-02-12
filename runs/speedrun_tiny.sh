@@ -11,6 +11,9 @@ export OMP_NUM_THREADS=1
 export NANOCHAT_BASE_DIR="${NANOCHAT_BASE_DIR:-$HOME/.cache/nanochat}"
 mkdir -p $NANOCHAT_BASE_DIR
 
+# Number of GPUs to use (can be overridden via environment variable)
+NPROC_PER_NODE="${NPROC_PER_NODE:-2}"
+
 # -----------------------------------------------------------------------------
 # NCCL configuration for distributed training
 # If you encounter P2P issues, set NCCL_P2P_DISABLE=1
@@ -92,7 +95,7 @@ if [[ "$STAGE" == "all" || "$STAGE" == "train" ]]; then
     # - No --fp8 (avoid NaN on tiny models)
     # - --core-metric-every=-1 (avoid crashing on long-context tasks like SQuAD)
     # - --save-every=50 (ensure we have checkpoints even if it crashes/stops early)
-    torchrun --standalone --nproc_per_node=2 -m scripts.base_train -- \
+    torchrun --standalone --nproc_per_node=$NPROC_PER_NODE -m scripts.base_train -- \
         --depth=4 \
         --max-seq-len=256 \
         --target-param-data-ratio=5.0 \
@@ -102,7 +105,7 @@ if [[ "$STAGE" == "all" || "$STAGE" == "train" ]]; then
         --run=$WANDB_RUN
 
     # evaluate the model (skip core metrics to avoid Sequence length errors)
-    torchrun --standalone --nproc_per_node=2 -m scripts.base_eval -- \
+    torchrun --standalone --nproc_per_node=$NPROC_PER_NODE -m scripts.base_eval -- \
         --device-batch-size=32 \
         --eval bpb,sample
     SECTION_DURATION=$(($SECONDS - $SECTION_START))
@@ -118,12 +121,12 @@ if [[ "$STAGE" == "all" || "$STAGE" == "sft" ]]; then
     curl -L -o $NANOCHAT_BASE_DIR/identity_conversations.jsonl https://karpathy-public.s3.us-west-2.amazonaws.com/identity_conversations.jsonl
 
     # run SFT and eval
-    torchrun --standalone --nproc_per_node=2 -m scripts.chat_sft -- \
+    torchrun --standalone --nproc_per_node=$NPROC_PER_NODE -m scripts.chat_sft -- \
         --device-batch-size=32 \
         --run=$WANDB_RUN
 
     # Run only lightweight evaluation (SpellingBee) to avoid timeout/OOM/Sequence length issues
-    torchrun --standalone --nproc_per_node=2 -m scripts.chat_eval -- -i sft -a SpellingBee
+    torchrun --standalone --nproc_per_node=$NPROC_PER_NODE -m scripts.chat_eval -- -i sft -a SpellingBee
     SECTION_DURATION=$(($SECONDS - $SECTION_START))
     echo "SFT completed in $(($SECTION_DURATION / 60)) minutes and $(($SECTION_DURATION % 60)) seconds."
 fi
@@ -134,7 +137,7 @@ if [[ "$STAGE" == "rl" ]]; then
     SECTION_START=$SECONDS
     source .venv/bin/activate
     echo "Starting RL..."
-    torchrun --standalone --nproc_per_node=2 -m scripts.chat_rl -- \
+    torchrun --standalone --nproc_per_node=$NPROC_PER_NODE -m scripts.chat_rl -- \
         --device-batch-size=4 \
         --run=$WANDB_RUN
     SECTION_DURATION=$(($SECONDS - $SECTION_START))
