@@ -12,7 +12,7 @@ export NANOCHAT_BASE_DIR="${NANOCHAT_BASE_DIR:-$HOME/.cache/nanochat}"
 mkdir -p $NANOCHAT_BASE_DIR
 
 # Number of GPUs to use (can be overridden via environment variable)
-NPROC_PER_NODE=1 #"${NPROC_PER_NODE:-2}"
+NPROC_PER_NODE="${NPROC_PER_NODE:-2}"
 
 # -----------------------------------------------------------------------------
 # NCCL configuration for distributed training
