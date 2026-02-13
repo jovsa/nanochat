@@ -46,7 +46,13 @@ Total training time: 0.00m
 Minimum validation bpb: 1.3456
 Per-piece (avg ms): data 17.2 | fwd 105.8 | bwd 233.7 | opt 44.2
 
-
+## stage 3:
+step 00010 (100.00%) | loss: 4.018104 | lrm: 0.00 | dt: 1736.40ms | tok/sec: 301,939 | mfu: 1.09 | epoch: 1 | total time: 0.00m
+  [per-piece ms] data: 33.3 | fwd: 108.1 | bwd: 241.5 | opt: 41.3
+Peak memory usage: 7119.54 MiB
+Total training time: 0.00m
+Minimum validation bpb: 1.3077
+Per-piece (avg ms): data 33.3 | fwd 108.1 | bwd 241.5 | opt 41.3
 
 
 
@@ -292,6 +298,7 @@ def simple_dataloader(split, max_seq_len, device_batch_size, row_capacity, bos_t
         for i, content_len in enumerate(row_lengths):
             if content_len < row_capacity:
                 targets[i, content_len - 1 :] = -1
+
         yield inputs, targets
 
 
